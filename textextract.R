@@ -1,5 +1,4 @@
 # Script to extract text from camera trap images
-# Jon Weissman 2023
 # Code covered by License: CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
 # README:
