@@ -38,7 +38,7 @@ text_boundaries = "264x64+900+1233"       # String with the text boundaries, in 
 ###################
 
 # List files to extract from:
-list.files(path, pattern = filename_pattern) ->
+list.files(path, pattern = filename_pattern, full.names = TRUE) ->
   filenames
 
 # For loop to avoid storing multiple images in memory
