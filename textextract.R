@@ -41,13 +41,18 @@ text_boundaries = "264x64+900+1233"       # String with the text boundaries, in 
 list.files(path, pattern = filename_pattern) ->
   filenames
 
-filenames %>% 
-  image_read() %>%
-  image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
-  image_crop(text_boundaries) %>% 
-  tesseract::ocr(engine = ocr_config) %>% 
-  stringr::str_replace_all("\n", " ") -> # remove newline characters
-  text_extracts 
+# For loop to avoid storing multiple images in memory
+text_extracts = c()     # empty results
+for (f in filenames) {
+  f %>% image_read() %>%
+    image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
+    image_crop(text_boundaries) %>% 
+    tesseract::ocr(engine = ocr_config) %>% 
+    stringr::str_replace_all("\n", " ") -> #remove newline characters
+    extracted_text
+  
+  text_extracts <- append(text_extracts, extracted_text)
+}
 
 # extract numeric values from text
 text_extracts %>% 
