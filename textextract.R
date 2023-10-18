@@ -22,6 +22,9 @@ library(tidyverse)
 library(tesseract)
 library(magick)
 
+library(exifr)
+library(lubridate)
+
 ## Different configurations for tesseract ocr ##
 # Standard configuratrion for English text:
 eng <- tesseract("eng") 
@@ -30,7 +33,8 @@ degrees <- tesseract(options = list(tessedit_char_whitelist = "-°CF.0123456789"
                                     tessedit_pageseg_mode = 7))
 
 ## USER OPTIONS ##
-path = "~/Documents/personal/cams/pics/100EK001"  # Change to directory containing images to be processed.
+#path = "~/Documents/personal/cams/pics/100EK001"  # Change to directory containing images to be processed.
+path = "./pics/100EK001/"
 filename_pattern = "JPG"    # Change to match all filenames containing this pattern 
 ocr_config = degrees        # Change to specific tesseract configuration you want. 
 # text_boundaries = "264x64+900+1233"       # String with the text boundaries, in pixels (Get with an image viewer)
@@ -46,15 +50,20 @@ list.files(path, pattern = filename_pattern, full.names = TRUE) ->
 text_extracts = c()     # empty results
 for (f in filenames) {
   f %>% image_read() %>%
+    image_crop(text_boundaries) ->
+  photo_text
+  
+  photo_text %>% 
     image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
-    image_crop(text_boundaries) %>%
     tesseract::ocr(engine = ocr_config) %>%
     stringr::str_replace_all("\n", " ") -> #remove newline characters
     extracted_text
 
-  print(paste(basename(f), extracted_text))
+  
+  # print(paste(basename(f), extracted_text)) # <- for progress monitoring, can comment out
 
   text_extracts <- append(text_extracts, extracted_text)
+  gc(verbose = FALSE)  # Really shouldn't have to do this, but maybe fixes windows cache problem.
 }
 
 # purely piped version. Is this the same memory use as for loop? Not sure
@@ -76,6 +85,18 @@ text_extracts %>%
 tibble(path = filenames, 
        file = basename(filenames), 
        text = text_extracts, 
-       degrees = numeric_extracts) %>% 
-  write_csv("100EK001_temp_c.csv")
+       degrees = numeric_extracts) ->
+  temps
+
+# get dates from exif
+filenames %>% 
+  exifr::read_exif(tags=c("DateTimeOriginal")) %>% 
+  mutate(datetime = lubridate::as_datetime(DateTimeOriginal)) %>% 
+  select(-DateTimeOriginal) ->
+  times
+
+temps %>% 
+  left_join(times, by = join_by(path == SourceFile)) ->
+  image_data
+  
  
