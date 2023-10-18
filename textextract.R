@@ -26,14 +26,15 @@ library(magick)
 # Standard configuratrion for English text:
 eng <- tesseract("eng") 
 # Configuration to read temperature strings:
-degrees <- tesseract(options = list(tessedit_char_whitelist = "°CF.0123456789-",
-                                    tessedit_pageseg_mode = 11))
+degrees <- tesseract(options = list(tessedit_char_whitelist = "-°CF.0123456789",
+                                    tessedit_pageseg_mode = 7))
 
 ## USER OPTIONS ##
-path = "~/personal/cams/"   # Change to directory containing images to be processed.
+path = "~/Documents/personal/cams/pics/100EK001"  # Change to directory containing images to be processed.
 filename_pattern = "JPG"    # Change to match all filenames containing this pattern 
 ocr_config = degrees        # Change to specific tesseract configuration you want. 
-text_boundaries = "264x64+900+1233"       # String with the text boundaries, in pixels (Get with an image viewer)
+# text_boundaries = "264x64+900+1233"       # String with the text boundaries, in pixels (Get with an image viewer)
+text_boundaries = "300x120+1800+2468"
 # See magick::image_crop() for format
 ###################
 
@@ -41,18 +42,29 @@ text_boundaries = "264x64+900+1233"       # String with the text boundaries, in 
 list.files(path, pattern = filename_pattern, full.names = TRUE) ->
   filenames
 
-# For loop to avoid storing multiple images in memory
+# # For loop to avoid storing multiple images in memory
 text_extracts = c()     # empty results
 for (f in filenames) {
   f %>% image_read() %>%
     image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
-    image_crop(text_boundaries) %>% 
-    tesseract::ocr(engine = ocr_config) %>% 
+    image_crop(text_boundaries) %>%
+    tesseract::ocr(engine = ocr_config) %>%
     stringr::str_replace_all("\n", " ") -> #remove newline characters
     extracted_text
-  
+
+  print(paste(basename(f), extracted_text))
+
   text_extracts <- append(text_extracts, extracted_text)
 }
+
+# purely piped version. Is this the same memory use as for loop? Not sure
+# filenames %>% 
+#   image_read() %>%
+#   image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
+#   image_crop(text_boundaries) %>% 
+#   tesseract::ocr(engine = ocr_config) %>% 
+#   stringr::str_replace_all("\n", " ") -> #remove newline characters
+#   text_extracts
 
 # extract numeric values from text
 text_extracts %>% 
@@ -61,4 +73,9 @@ text_extracts %>%
   numeric_extracts
 
 # dataframe (tibble) with results
-tibble(filenames, text_extracts, numeric_extracts)
+tibble(path = filenames, 
+       file = basename(filenames), 
+       text = text_extracts, 
+       degrees = numeric_extracts) %>% 
+  write_csv("100EK001_temp_c.csv")
+ 
