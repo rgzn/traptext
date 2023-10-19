@@ -50,17 +50,17 @@ list.files(path, pattern = filename_pattern, full.names = TRUE) ->
 text_extracts = c()     # empty results
 for (f in filenames) {
   f %>% 
-    image_read() -> full_image
+    magick::image_read() -> full_image
   full_image %>% 
-    image_crop(text_boundaries) -> cropped_image
-  image_destroy(full_image)     # Minimize unnecessary image memeory use
+    magick::image_crop(text_boundaries) -> cropped_image
+  magick::image_destroy(full_image)     # Minimize unnecessary image memeory use
   
   cropped_image %>% 
-    image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
+    magick::image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
     tesseract::ocr(engine = ocr_config) %>%
     stringr::str_replace_all("\n", " ") -> #remove newline characters
     extracted_text
-  image_destroy(cropped_image)   # Minimize unnecessary image memeory use
+  magick::image_destroy(cropped_image)   # Minimize unnecessary image memeory use
   # print(paste(basename(f), extracted_text)) # <- for progress monitoring, can comment out
   text_extracts <- append(text_extracts, extracted_text)
 }
