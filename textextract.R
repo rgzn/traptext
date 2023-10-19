@@ -48,37 +48,27 @@ list.files(path, pattern = filename_pattern, full.names = TRUE) ->
 
 # # For loop to avoid storing multiple images in memory
 text_extracts = c()     # empty results
-for (f in filenames) {
-  f %>% image_read() %>%
-    image_crop(text_boundaries) ->
-  photo_text
+for (f in filenames[1:100]) {
+  f %>% 
+    image_read() -> full_image
+  full_image %>% 
+    image_crop(text_boundaries) -> cropped_image
+  image_destroy(full_image)     # Minimize unnecessary image memeory use
   
-  photo_text %>% 
+  cropped_image %>% 
     image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
     tesseract::ocr(engine = ocr_config) %>%
     stringr::str_replace_all("\n", " ") -> #remove newline characters
     extracted_text
-
-  
+  image_destroy(cropped_image)   # Minimize unnecessary image memeory use
   # print(paste(basename(f), extracted_text)) # <- for progress monitoring, can comment out
-
   text_extracts <- append(text_extracts, extracted_text)
-  gc(verbose = FALSE)  # Really shouldn't have to do this, but maybe fixes windows cache problem.
 }
-
-# purely piped version. Is this the same memory use as for loop? Not sure
-# filenames %>% 
-#   image_read() %>%
-#   image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
-#   image_crop(text_boundaries) %>% 
-#   tesseract::ocr(engine = ocr_config) %>% 
-#   stringr::str_replace_all("\n", " ") -> #remove newline characters
-#   text_extracts
 
 # extract numeric values from text
 text_extracts %>% 
   stringr::str_extract("[0-9.-]+") %>%
-  as.numeric()->
+  as.numeric() ->
   numeric_extracts
 
 # dataframe (tibble) with results
