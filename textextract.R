@@ -48,7 +48,7 @@ list.files(path, pattern = filename_pattern, full.names = TRUE) ->
 
 # # For loop to avoid storing multiple images in memory
 text_extracts = c()     # empty results
-for (f in filenames[1:100]) {
+for (f in filenames) {
   f %>% 
     image_read() -> full_image
   full_image %>% 
