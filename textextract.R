@@ -43,7 +43,10 @@ text_boundaries = "300x120+1800+2468"
 ###################
 
 # List files to extract from:
-list.files(path, pattern = filename_pattern, full.names = TRUE) ->
+list.files(path, 
+           pattern = filename_pattern, 
+           full.names = TRUE,
+           recursive = TRUE) ->
   filenames
 
 # # For loop to avoid storing multiple images in memory
