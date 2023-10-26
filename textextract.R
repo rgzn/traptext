@@ -31,11 +31,19 @@ eng <- tesseract("eng")
 # Configuration to read temperature strings:
 degrees <- tesseract(options = list(tessedit_char_whitelist = "-°CF.0123456789",
                                     tessedit_pageseg_mode = 7))
-
+###################
 ## USER OPTIONS ##
+
+# test mode:
+# test_subset = FALSE # If false, will run the script on all images found
+test_subset = 400     # If N, will run on random sample of N images
+
+# Image locations:
 #path = "~/Documents/personal/cams/pics/100EK001"  # Change to directory containing images to be processed.
 path = "./pics/100EK001/"
 filename_pattern = "JPG"    # Change to match all filenames containing this pattern 
+
+# OCR options: 
 ocr_config = degrees        # Change to specific tesseract configuration you want. 
 # text_boundaries = "264x64+900+1233"       # String with the text boundaries, in pixels (Get with an image viewer)
 text_boundaries = "300x120+1800+2468"
@@ -48,6 +56,11 @@ list.files(path,
            full.names = TRUE,
            recursive = TRUE) ->
   filenames
+
+# Test only 100 photos:
+if(test_subset) {
+  sample(filenames, size = test_subset ) -> filenames
+}
 
 # # For loop to avoid storing multiple images in memory
 text_extracts = c()     # empty results
@@ -91,5 +104,45 @@ filenames %>%
 temps %>% 
   left_join(times, by = join_by(path == SourceFile)) ->
   image_data
-  
- 
+
+# 1. lambing:  June 1-14
+# 2. Summer: June 15-Aug 14
+# 3. Fall:  Aug 15-Oct 31
+# 4. Rut:  Nov 1-Dec 31
+# 5. Early Winter:  Jan 1-Feb 28
+# 6. Late winter:  Mar 1-15
+# 
+# seasons <- tibble(season = c("Early Winter", "Late Winter", "Lambing", "Summer", "Fall", "Rut"),
+#                   start = c("Jan 1", "Mar 1", "Jun 1", "Jun 15", "Aug 15", "Nov 1"))
+
+# Season start dates. End dates are determined by next start date or end of year
+season_cuts <- c("Early Winter" = "Jan 1", 
+                 "Late Winter" = "Mar 1", 
+                 "Lambing" = "Jun 1", 
+                 "Summer" = "Jun 15", 
+                 "Fall" = "Aug 15", 
+                 "Rut" = "Nov 1") 
+# get_season
+# Arguments:  date - the date to determine a season for
+#             season_cuts - chr vector with season names and yearless dates
+#
+# Function to encapsulate the date conversions for finding season.
+# Using the actual year matters due to leap years. 
+# This takes a date, and constructs actual dates in that year
+# based on the yearless month/day season starts in season_cuts
+# With actual season dates 
+# 
+get_season <- function(date, season_cuts) {
+  date = lubridate::as_date(date)
+  year = lubridate::year(date)
+  season_dates = lubridate::mdy(paste(season_cuts,  year))
+  season_index = findInterval(date, season_dates)
+  return(names(season_cuts[season_index]))
+}
+
+# Add in season column
+image_data %>% 
+  rowwise() %>% 
+  mutate(season = get_season(datetime, season_cuts)) ->
+  image_data
+
