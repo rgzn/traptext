@@ -71,11 +71,48 @@ for (f in filenames) {
     magick::image_crop(text_boundaries) -> cropped_image
   magick::image_destroy(full_image)     # Minimize unnecessary image memeory use
   
-  cropped_image %>% 
+  cropped_image %>%
     magick::image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
-    tesseract::ocr(engine = ocr_config) %>%
-    stringr::str_replace_all("\n", " ") -> #remove newline characters
+    #magick::image_blur() %>% 
+    #magick::image_trim(fuzz = 1) %>%
+    #image_threshold(type = "white", threshold = "50%") %>%
+    #image_threshold(type = "black", threshold = "50%") ->
+    cropped_image
+
+  cropped_image %>%
+    tesseract::ocr_data(engine = character) ->
+    extracted_texts
+
+  # extracted_texts %>% 
+  #   mutate(in_F = str_detect(word,  "F"),
+  #          t_raw = as.numeric(str_extract(word, "[0-9.-]+")), 
+  #          t_c = round((t_raw - in_F*32)*(in_F*(5/9) + !in_F))) %>% 
+  #   arrange(desc(confidence)) %>% 
+  #   slice_head(n=1) ->
+  #   extracted_texts
+  
+
+  
+  extracted_texts %>% 
+    filter(str_detect(word, "[0-9]")) %>% 
+    last() %>%
+    select(word) %>%
+    unlist() ->
     extracted_text
+  
+  print(f)
+  print(extracted_texts)
+  
+  plot(new_image)
+  title(main = list(paste(basename(f),
+                          "       ", 
+                          first(extracted_texts$word), 
+                          last(extracted_texts$word)),
+                    cex = 1.5,
+                    col = "red", font = 3))
+  
+  
+  
   magick::image_destroy(cropped_image)   # Minimize unnecessary image memeory use
   # print(paste(basename(f), extracted_text)) # <- for progress monitoring, can comment out
   text_extracts <- append(text_extracts, extracted_text)
