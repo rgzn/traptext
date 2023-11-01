@@ -31,6 +31,10 @@ eng <- tesseract("eng")
 # Configuration to read temperature strings:
 degrees <- tesseract(options = list(tessedit_char_whitelist = "-°CF.0123456789",
                                     tessedit_pageseg_mode = 7))
+character <- tesseract(language = "eng", 
+                       options = list(tessedit_char_whitelist = " -CF0123456789°",
+                                      tessedit_pageseg_mode = 7,
+                                      hocr_char_boxes = 1))
 ###################
 ## USER OPTIONS ##
 
