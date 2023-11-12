@@ -29,122 +29,44 @@ library(lubridate)
 # Standard configuratrion for English text:
 eng <- tesseract("eng") 
 # Configuration to read temperature strings:
-degrees <- tesseract(options = list(tessedit_char_whitelist = "-°CF.0123456789",
-                                    tessedit_pageseg_mode = 7))
+degrees <- tesseract(options = list(tessedit_char_whitelist = " -°CcF.0123456789",
+                                    tessedit_pageseg_mode = 8,
+                                    hocr_char_boxes = 1,
+                                    lstm_choice_mode = 1))
 character <- tesseract(language = "eng", 
-                       options = list(tessedit_char_whitelist = " -CF0123456789°",
+                       options = list(tessedit_char_whitelist = " -CF0123456789° ºC℃",
+                                      tessedit_pageseg_mode = 13,
+                                      hocr_char_boxes = 1,
+                                      tessedit_ocr_engine_mode = 1))
+
+debug <- tesseract(language = "deu", 
+                       options = list(tessedit_char_whitelist = " -CcF0123456789° ºC℃",
                                       tessedit_pageseg_mode = 7,
-                                      hocr_char_boxes = 1))
+                                      # hocr_char_boxes = 1,
+                                      lstm_choice_mode = 1))
 ###################
 ## USER OPTIONS ##
 
 # test mode:
-# test_subset = FALSE # If false, will run the script on all images found
-test_subset = 400     # If N, will run on random sample of N images
+test_subset = FALSE # If false, will run the script on all images found
+# test_subset = 400     # If N, will run on random sample of N images
 
 # Image locations:
 #path = "~/Documents/personal/cams/pics/100EK001"  # Change to directory containing images to be processed.
-path = "./pics/100EK001/"
+#path = "./pics/100EK001/"
+# path = "./pics/WRCOTL/"
+path = "./pics/S2BUTL/"
 filename_pattern = "JPG"    # Change to match all filenames containing this pattern 
 
 # OCR options: 
-ocr_config = degrees        # Change to specific tesseract configuration you want. 
+ocr_config = character        # Change to specific tesseract configuration you want. 
 # text_boundaries = "264x64+900+1233"       # String with the text boundaries, in pixels (Get with an image viewer)
-text_boundaries = "300x120+1800+2468"
+# text_boundaries = "300x120+1800+2468" #
+# text_boundaries = "170x60+908+1236"   # wrcotl c only
+# text_boundaries = "340x60+782+1236"  # wrcotl f and c
+text_boundaries = "770x178+3096+3914"
 # See magick::image_crop() for format
-###################
 
-# List files to extract from:
-list.files(path, 
-           pattern = filename_pattern, 
-           full.names = TRUE,
-           recursive = TRUE) ->
-  filenames
-
-# Test only 100 photos:
-if(test_subset) {
-  sample(filenames, size = test_subset ) -> filenames
-}
-
-# # For loop to avoid storing multiple images in memory
-text_extracts = c()     # empty results
-for (f in filenames) {
-  f %>% 
-    magick::image_read() -> full_image
-  full_image %>% 
-    magick::image_crop(text_boundaries) -> cropped_image
-  magick::image_destroy(full_image)     # Minimize unnecessary image memeory use
-  
-  cropped_image %>%
-    magick::image_convert(type = 'Grayscale') %>%  # easier OCR in grayscale
-    #magick::image_blur() %>% 
-    #magick::image_trim(fuzz = 1) %>%
-    #image_threshold(type = "white", threshold = "50%") %>%
-    #image_threshold(type = "black", threshold = "50%") ->
-    cropped_image
-
-  cropped_image %>%
-    tesseract::ocr_data(engine = character) ->
-    extracted_texts
-
-  # extracted_texts %>% 
-  #   mutate(in_F = str_detect(word,  "F"),
-  #          t_raw = as.numeric(str_extract(word, "[0-9.-]+")), 
-  #          t_c = round((t_raw - in_F*32)*(in_F*(5/9) + !in_F))) %>% 
-  #   arrange(desc(confidence)) %>% 
-  #   slice_head(n=1) ->
-  #   extracted_texts
-  
-
-  
-  extracted_texts %>% 
-    filter(str_detect(word, "[0-9]")) %>% 
-    last() %>%
-    select(word) %>%
-    unlist() ->
-    extracted_text
-  
-  print(f)
-  print(extracted_texts)
-  
-  plot(new_image)
-  title(main = list(paste(basename(f),
-                          "       ", 
-                          first(extracted_texts$word), 
-                          last(extracted_texts$word)),
-                    cex = 1.5,
-                    col = "red", font = 3))
-  
-  
-  
-  magick::image_destroy(cropped_image)   # Minimize unnecessary image memeory use
-  # print(paste(basename(f), extracted_text)) # <- for progress monitoring, can comment out
-  text_extracts <- append(text_extracts, extracted_text)
-}
-
-# extract numeric values from text
-text_extracts %>% 
-  stringr::str_extract("[0-9.-]+") %>%
-  as.numeric() ->
-  numeric_extracts
-
-# dataframe (tibble) with results
-tibble(path = filenames, 
-       file = basename(filenames), 
-       text = text_extracts, 
-       degrees = numeric_extracts) ->
-  temps
-
-# get dates from exif
-filenames %>% 
-  exifr::read_exif(tags=c("DateTimeOriginal")) %>% 
-  mutate(datetime = lubridate::as_datetime(DateTimeOriginal)) %>% 
-  select(-DateTimeOriginal) ->
-  times
-
-temps %>% 
-  left_join(times, by = join_by(path == SourceFile)) ->
-  image_data
 
 # 1. lambing:  June 1-14
 # 2. Summer: June 15-Aug 14
@@ -163,6 +85,101 @@ season_cuts <- c("Early Winter" = "Jan 1",
                  "Summer" = "Jun 15", 
                  "Fall" = "Aug 15", 
                  "Rut" = "Nov 1") 
+
+###################
+
+###################
+## FUNCTIONS ##
+
+# extract_text #
+# function to OCR temp text from images:
+extract_text = function(image_path, bbox, ocr_config, debug= FALSE) {
+  full_image = magick::image_read(image_path)
+  cropped_image = magick::image_crop(full_image, bbox)
+  magick::image_destroy(full_image)
+  cropped_image %>%
+    magick::image_convert(type = 'Grayscale') %>% 
+    #magick::image_trim(fuzz = 1) %>% 
+    image_threshold(type = "white", threshold = "50%") %>%
+    image_threshold(type = "black", threshold = "50%") ->
+    cropped_image
+  cropped_image %>%
+    tesseract::ocr_data(engine = ocr_config) ->
+    extracted_texts
+  
+  if(debug) {
+    plot(cropped_image)
+
+    #error correction:
+    extracted_texts %>%
+      mutate(corrected_word = str_replace(word, "^8([0-9])","3\\1")) %>% #3/8 confusion
+      mutate(corrected_word =
+               if_else(str_detect(corrected_word, "[CFcf]"),
+                       corrected_word,
+                       str_replace(corrected_word, "([0-9])0$","\\1C"))) %>%
+      mutate(corrected_word = str_replace(corrected_word, "([2-90][0-9])[0-9]+","\\1")) %>%
+      mutate(number = as.numeric(str_extract(corrected_word, "-?[0-9]+"))) %>%
+      mutate(scale = str_extract(corrected_word, "[CcFf]")) ->
+      extracted_texts
+
+
+
+    extracted_texts %>%
+      arrange(desc(confidence)) %>%
+      filter(str_detect(word, "[0-9]")) %>%
+      slice_head(n = 1) %>%
+      select(corrected_word) %>%
+      as.character() ->
+      hi_conf_word
+
+
+    # for print
+    extracted_texts %>%
+      select(corrected_word) %>%
+      unlist() %>%
+      paste(collapse = ' ') ->
+      words
+
+    title(main = list(paste(basename(image_path),
+                            "       ",
+                            words),
+                      cex = 1.5,
+                      col = "red", font = 3),
+          sub = list(hi_conf_word,
+                     col = "red",
+                     cex = 4,
+                     font = 10))
+  }
+  magick::image_destroy(cropped_image)
+  extracted_texts %>% 
+    mutate(file = image_path) %>% 
+    return()
+}
+
+# clean_extract #
+# clean extracted OCR text assuming temeprature format
+# raise warning flags for suspicious values
+clean_extract <- function(extracted_texts) {
+  extracted_texts %>% 
+    mutate(corrected_word = str_replace(word, "^8([0-9])","3\\1")) %>% #3/8 confusion
+    mutate(corrected_word = 
+             if_else(str_detect(corrected_word, "[CFcf]"),
+                     corrected_word,
+                     str_replace(corrected_word, "([0-9])0$","\\1C"))) %>% 
+    mutate(corrected_word = str_replace(corrected_word, "([2-90][0-9])[0-9]+","\\1")) %>% 
+    mutate(number = as.numeric(str_extract(corrected_word, "-?[0-9]+"))) %>% 
+    mutate(scale = str_extract(corrected_word, "[CcFf]")) ->
+    extracted_texts
+  
+  extracted_texts %>% 
+    select(file, scale, number) %>% 
+    pivot_wider(names_from = scale, values_from = number) %>%
+    mutate(difference_c = (F-32)*(5/9) - C) %>% 
+    mutate(warning = (abs(difference_c) > 1))
+  
+}
+
+
 # get_season
 # Arguments:  date - the date to determine a season for
 #             season_cuts - chr vector with season names and yearless dates
@@ -180,6 +197,45 @@ get_season <- function(date, season_cuts) {
   season_index = findInterval(date, season_dates)
   return(names(season_cuts[season_index]))
 }
+
+###################
+
+###################
+## Main Script ##
+
+# List files to extract from:
+list.files(path, 
+           pattern = filename_pattern, 
+           full.names = TRUE,
+           recursive = TRUE) ->
+  filenames
+
+# Use only subset of photos for testing:
+if(test_subset) {
+  sample(filenames, size = test_subset ) -> filenames
+}
+
+# Map the extract_text function to all the files:
+filenames %>% 
+  map(~ extract_text(.x, bbox = text_boundaries, ocr_config = character)) ->
+  raw_extracts
+
+
+raw_extracts %>% 
+  map(~ clean_extract(.x)) %>%
+  map_dfr(bind_rows) -> 
+  temps
+
+# get dates from exif
+filenames %>% 
+  exifr::read_exif(tags=c("DateTimeOriginal")) %>% 
+  mutate(datetime = lubridate::as_datetime(DateTimeOriginal)) %>% 
+  select(-DateTimeOriginal) ->
+  times
+
+temps %>% 
+  left_join(times, by = join_by(file == SourceFile)) ->
+  image_data
 
 # Add in season column
 image_data %>% 
